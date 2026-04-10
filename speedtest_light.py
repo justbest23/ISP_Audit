@@ -12,6 +12,8 @@ Cron example (every 20 min):
 
 import sys
 import os
+
+from speedtest_common import run_eweka
 sys.path.insert(0, os.path.dirname(__file__))
 
 from speedtest_common import *
@@ -29,4 +31,5 @@ if __name__ == "__main__":
     run_ping_tests(timestamp)
     run_mtr_tests(timestamp)
     run_dns_tests(timestamp)
+    run_eweka(timestamp, duration_s=30)
     print("=== [LIGHT] Done ===")

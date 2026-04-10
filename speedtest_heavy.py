@@ -24,4 +24,5 @@ if __name__ == "__main__":
     print(f"=== [HEAVY] Speedtest run: {timestamp} ===")
     init_csvs()
     run_curl_heavy(timestamp)
+    run_eweka(timestamp, duration_s=300)
     print("=== [HEAVY] Done ===")
