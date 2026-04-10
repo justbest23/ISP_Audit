@@ -7,24 +7,7 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime, timedelta
 
-
-
-
 LOG_DIR = "/home/troggoman/speedtests/logs"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # ---------------------------------------------------------------------------
 # Design tokens — user's customised values, do not change
@@ -184,9 +167,8 @@ GAP = html.Div(style={"height": "2px"})
 
 app = dash.Dash(__name__, title="SIGMON // Speed Monitor")
 
-## ChatGPT Additions ##
 server = app.server
-###
+
 app.index_string = '''
 <!DOCTYPE html>
 <html>
@@ -262,6 +244,7 @@ def update_dashboard(n):
     df_curl  = load_csv("curl.csv")
     df_ping  = load_csv("ping.csv")
     df_dns   = load_csv("dns.csv")
+    df_mtr   = load_csv("mtr.csv")  # <-- NEW: Load MTR data
 
     # Split curl by target and size
     curl_targets = {}
@@ -287,6 +270,12 @@ def update_dashboard(n):
     if df_dns is not None and "resolver" in df_dns.columns:
         for label, tdf in df_dns.groupby("resolver"):
             dns_by_resolver[label] = tdf.reset_index(drop=True)
+
+    # Split mtr by label (e.g., "NAPAfrica-JHB")
+    mtr_by_label = {}
+    if df_mtr is not None and "label" in df_mtr.columns:
+        for label, tdf in df_mtr.groupby("label"):
+            mtr_by_label[label] = tdf.reset_index(drop=True)
 
     # ── KPI strip ────────────────────────────────────────────────────────────
     ookla_dl  = latest_val(df_ookla, "download_mbps")
@@ -458,6 +447,65 @@ def update_dashboard(n):
         dcc.Graph(figure=fig_dns, config={"displayModeBar": False}, style={"height": "160px"}),
     ])
 
+    # ── MTR (PingPlotter-style) ───────────────────────────────────────────────
+    MTR_COLORS = {
+        "NAPAfrica-JHB":     ACCENT_GREEN,
+        "TENET-JHB":         ACCENT_BLUE,
+        "Dota2-CS2-JHB":     ACCENT_AMBER,
+        "Valorant-JHB":      ACCENT_PURPLE,
+        "AWS-CapeTown":      ACCENT_RED,
+        "Netflix-OC-JHB":    ACCENT_GREEN,
+        "Seacom-London":     ACCENT_BLUE,
+        "AMS-IX-Europe":     ACCENT_AMBER,
+        "Cloudflare-DNS":    ACCENT_PURPLE,
+        "Google-DNS":        ACCENT_RED,
+    }
+
+    fig_mtr_latency = make_fig()
+    fig_mtr_loss = make_fig()
+
+    mtr_cards = []
+    for label, color in MTR_COLORS.items():
+        df_m = mtr_by_label.get(label)
+        if df_m is None:
+            continue
+        # Add traces
+        make_line(fig_mtr_latency, df_m, "avg_ms", label, color)
+        make_line(fig_mtr_loss,    df_m, "loss_pct", label, color)
+        # Create mini stat cards
+        lv_avg = latest_val(df_m, "avg_ms")
+        lv_loss = latest_val(df_m, "loss_pct")
+        mtr_cards.append(mini_stat(
+            label.replace("-", " ").upper(),
+            fmt(lv_avg), "ms",
+            ACCENT_GREEN if (lv_avg or 999) < 30 else (ACCENT_AMBER if (lv_avg or 999) < 80 else ACCENT_RED)
+        ))
+        mtr_cards.append(mini_stat(
+            f"{label[:10]} LOSS",
+            fmt(lv_loss, 1), "%",
+            ACCENT_GREEN if (lv_loss or 1) < 0.5 else (ACCENT_AMBER if (lv_loss or 1) < 2 else ACCENT_RED)
+        ))
+
+    fig_mtr_latency.update_layout(yaxis_title="ms")
+    fig_mtr_loss.update_layout(yaxis_title="% loss")
+
+    mtr_panel = chart_panel([
+        section_header("MTR (PingPlotter) – PATH LATENCY & LOSS", "every 20 min"),
+        html.Div(mtr_cards, style={"display": "flex", "gap": "2px", "marginBottom": "12px", "flexWrap": "wrap"}),
+        html.Div([
+            html.Div([
+                html.Div("AVG LATENCY (ms)", style={"fontFamily": FONT_MONO, "fontSize": "10px",
+                                                     "color": TEXT_DIM, "marginBottom": "4px"}),
+                dcc.Graph(figure=fig_mtr_latency, config={"displayModeBar": False}, style={"height": "200px"}),
+            ], style={"flex": "2"}),
+            html.Div([
+                html.Div("PACKET LOSS (%)", style={"fontFamily": FONT_MONO, "fontSize": "10px",
+                                                    "color": TEXT_DIM, "marginBottom": "4px"}),
+                dcc.Graph(figure=fig_mtr_loss, config={"displayModeBar": False}, style={"height": "200px"}),
+            ], style={"flex": "1"}),
+        ], style={"display": "flex", "gap": "2px"}),
+    ])
+
     # ── Curl targets ─────────────────────────────────────────────────────────
     CURL_COLORS = {
         "hetzner_fsn1": ACCENT_GREEN,
@@ -471,12 +519,8 @@ def update_dashboard(n):
         "hetzner_hel1": "Hetzner HEL1 (Helsinki)",
         "ubuntu_noble": "Ubuntu ISO / Canonical CDN",
     }
-    # curl_targets is grouped by target_name and contains ALL sizes mixed.
-    # Filter by file_size_mb to separate light (100MB), heavy (1GB), and
-    # superheavy (10GB) runs correctly using proper pandas boolean indexing.
 
     def curl_filter(k, min_mb, max_mb):
-        """Return rows for target k where file_size_mb is in [min_mb, max_mb]."""
         if k not in curl_targets:
             return None
         tdf = curl_targets[k]
@@ -514,8 +558,7 @@ def update_dashboard(n):
         ))
     fig_curl_heavy.update_layout(yaxis_title="Mbps")
 
-    # Stat cards — one per unique target, using 100MB runs for light targets
-    # and the appropriate size for heavy (ubuntu uses all its data, Hetzner 1GB)
+    # Stat cards — one per unique target
     curl_stats = []
     stat_configs = [
         ("hetzner_fsn1",  50,  200),
@@ -643,10 +686,8 @@ def update_dashboard(n):
         row_fast_ndt7, GAP,
         iperf_panel, GAP,
         ping_panel, GAP,
-        html.Div([
-            html.Div([dns_panel], style={"flex": "1"}),
-        ], style={"display": "flex", "gap": "2px", "marginTop": "2px"}),
-        GAP,
+        dns_panel, GAP,
+        mtr_panel, GAP,   # <-- NEW MTR panel inserted here
         curl_panel, GAP,
         sh_panel,
         html.Div(style={"height": "20px"}),
