@@ -7,23 +7,24 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime, timedelta
 
+
+
+
 LOG_DIR = "/home/troggoman/speedtests/logs"
 
-# ---------------------------------------------------------------------------
-# MTR (PingPlotter-style) Audit Targets
-# ---------------------------------------------------------------------------
-MTR_TARGETS = [
-    ("196.60.8.1",      "NAPAfrica-JHB"),
-    ("155.232.0.1",     "TENET-JHB"),
-    ("197.80.200.1",    "Dota2-CS2-JHB"),
-    ("160.119.102.162", "Valorant-JHB"),
-    ("rds.af-south-1.amazonaws.com", "AWS-CapeTown"),
-    ("197.221.23.194",  "Netflix-OC-JHB"),
-    ("193.58.13.249",   "Seacom-London"),
-    ("80.249.208.1",    "AMS-IX-Europe"),
-    ("1.1.1.1",         "Cloudflare-DNS"),
-    ("8.8.8.8",         "Google-DNS"),
-]
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ---------------------------------------------------------------------------
 # Design tokens — user's customised values, do not change
@@ -40,29 +41,22 @@ ACCENT_PURPLE= "#a78bfa"
 TEXT_PRIMARY = "#e8edf2"
 TEXT_MUTED   = "#b6bfc5"
 TEXT_DIM     = "#3ec569"
+
 FONT_MONO    = "'JetBrains Mono', 'Fira Code', 'Courier New', monospace"
 FONT_UI      = "'DM Sans', 'Helvetica Neue', sans-serif"
-BG_TRANSPARENT = "rgba(0,0,0,0)"
 
-PLOTLY_THEME = {
-    "paper_bgcolor": "BG_TRANSPARENT",
-    "plot_bgcolor": "BG_TRANSPARENT",
-    "font": {"family": FONT_MONO, "color": TEXT_MUTED, "size": 11},
-    "xaxis": {"gridcolor": BG_PANEL2, "linecolor": BORDER, "tickcolor": TEXT_DIM, "zeroline": False},
-    "yaxis": {"gridcolor": BG_PANEL2, "linecolor": BORDER, "tickcolor": TEXT_DIM, "zeroline": False},
-    "legend": {"bgcolor": "BG_TRANSPARENT", "bordercolor": BORDER, "borderwidth": 1, "font": {"size": 10}},
-    "margin": {"l": 48, "r": 16, "t": 16, "b": 40},
-    "hovermode": "x unified",
-    "hoverlabel": {"bgcolor": BG_PANEL2, "bordercolor": BORDER,
-                    "font": {"family": FONT_MONO, "size": 11, "color": TEXT_PRIMARY}},
-}
-
-PING_COLORS = {
-    "Cloudflare-DNS-JHB": ACCENT_GREEN,
-    "Google-DNS":         ACCENT_BLUE,
-    "MLab-JHB":           ACCENT_AMBER,
-    "JHB-Local":          ACCENT_PURPLE,
-}
+PLOTLY_THEME = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family=FONT_MONO, color=TEXT_MUTED, size=11),
+    xaxis=dict(gridcolor=BG_PANEL2, linecolor=BORDER, tickcolor=TEXT_DIM, zeroline=False),
+    yaxis=dict(gridcolor=BG_PANEL2, linecolor=BORDER, tickcolor=TEXT_DIM, zeroline=False),
+    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=BORDER, borderwidth=1, font=dict(size=10)),
+    margin=dict(l=48, r=16, t=16, b=40),
+    hovermode="x unified",
+    hoverlabel=dict(bgcolor=BG_PANEL2, bordercolor=BORDER,
+                    font=dict(family=FONT_MONO, size=11, color=TEXT_PRIMARY)),
+)
 
 # ---------------------------------------------------------------------------
 # Data helpers
@@ -111,7 +105,7 @@ def make_line(fig, df, col, name, color, dash="solid", mode="lines"):
     d = df[["timestamp", col]].dropna()
     fig.add_trace(go.Scatter(
         x=d["timestamp"], y=d[col], name=name, mode=mode,
-        line={"color": color, "width": 1.5, "dash": dash},
+        line=dict(color=color, width=1.5, dash=dash),
         hovertemplate=f"%{{y:.1f}}<extra>{name}</extra>",
     ))
 
@@ -192,9 +186,7 @@ app = dash.Dash(__name__, title="SIGMON // Speed Monitor")
 
 ## ChatGPT Additions ##
 server = app.server
-app.config.suppress_callback_exceptions = True # Needed for dynamic MTR Dropdown
 ###
-
 app.index_string = '''
 <!DOCTYPE html>
 <html>
@@ -217,11 +209,6 @@ app.index_string = '''
         }
         @keyframes fadein { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .panel { animation: fadein 0.35s ease both; }
-        .dash-dropdown .Select-control { background-color: #131920; border: 1px solid #1e2a35; color: #e8edf2; }
-        .dash-dropdown .Select-value-label { color: #e8edf2 !important; }
-        .dash-dropdown .Select-menu-outer { background-color: #131920; border: 1px solid #1e2a35; }
-        .dash-dropdown .VirtualizedSelectOption { background-color: #131920; color: #e8edf2; }
-        .dash-dropdown .VirtualizedSelectFocusedOption { background-color: #1e2a35; }
     </style>
 </head>
 <body>{%app_entry%}<footer>{%config%}{%scripts%}{%renderer%}</footer>
@@ -252,25 +239,8 @@ app.layout = html.Div([
         "backgroundColor": BG_PANEL, "position": "sticky", "top": "0", "zIndex": "100",
     }),
 
-    html.Div([
-        dcc.Dropdown(
-            id="mtr-target-selector",
-            options=[{"label": name, "value": name} for _, name in MTR_TARGETS],
-            value="NAPAfrica-JHB",
-            clearable=False,
-            className="dash-dropdown",
-            style={
-                "backgroundColor": BG_PANEL2,
-                "color": "#000",
-                "width": "250px",
-                "fontFamily": FONT_MONO,
-                "fontSize": "11px",
-                "border": f"1px solid {BORDER}",
-                "marginBottom": "16px",
-            },
-        ),
-        html.Div(id="dashboard-content")
-    ], style={"padding": "20px 24px", "maxWidth": "1600px", "margin": "0 auto"}),
+    html.Div([html.Div(id="dashboard-content")],
+             style={"padding": "20px 24px", "maxWidth": "1600px", "margin": "0 auto"}),
 ], style={"backgroundColor": BG_PAGE, "minHeight": "100vh"})
 
 # ---------------------------------------------------------------------------
@@ -282,50 +252,43 @@ def update_clock(n):
     return datetime.now().strftime("%Y-%m-%d  %H:%M:%S")
 
 
-def _load_all_data():
-    """Load all CSV data sources."""
-    return {
-        "ookla": load_csv("ookla.csv"),
-        "fast": load_csv("fast.csv"),
-        "iperf": load_csv("iperf3.csv"),
-        "ndt7": load_csv("ndt7.csv"),
-        "curl": load_csv("curl.csv"),
-        "ping": load_csv("ping.csv"),
-        "dns": load_csv("dns.csv"),
-        "mtr": load_csv("mtr.csv"),
-    }
+@app.callback(Output("dashboard-content", "children"), Input("tick", "n_intervals"))
+def update_dashboard(n):
 
-def _split_curl_data(df_curl):
-    """Split curl data by target and size."""
+    df_ookla = load_csv("ookla.csv")
+    df_fast  = load_csv("fast.csv")
+    df_iperf = load_csv("iperf3.csv")
+    df_ndt7  = load_csv("ndt7.csv")
+    df_curl  = load_csv("curl.csv")
+    df_ping  = load_csv("ping.csv")
+    df_dns   = load_csv("dns.csv")
+
+    # Split curl by target and size
     curl_targets = {}
-    curl_superheavy = {}
     if df_curl is not None and "target_name" in df_curl.columns:
         for tname, tdf in df_curl.groupby("target_name"):
             curl_targets[tname] = tdf.reset_index(drop=True)
+
+    # For superheavy: curl entries with file_size_mb == 10000
+    curl_superheavy = {}
     if df_curl is not None and "file_size_mb" in df_curl.columns:
         sh = df_curl[df_curl["file_size_mb"] >= 9000]
         for tname, tdf in sh.groupby("target_name"):
             curl_superheavy[tname] = tdf.reset_index(drop=True)
-    return curl_targets, curl_superheavy
 
-def _split_ping_data(df_ping):
-    """Split ping data by host_label."""
+    # Split ping by host_label
     ping_by_host = {}
     if df_ping is not None and "host_label" in df_ping.columns:
         for label, tdf in df_ping.groupby("host_label"):
             ping_by_host[label] = tdf.reset_index(drop=True)
-    return ping_by_host
 
-def _split_dns_data(df_dns):
-    """Split DNS data by resolver."""
+    # Split dns by resolver
     dns_by_resolver = {}
     if df_dns is not None and "resolver" in df_dns.columns:
         for label, tdf in df_dns.groupby("resolver"):
             dns_by_resolver[label] = tdf.reset_index(drop=True)
-    return dns_by_resolver
 
-def _build_kpi_strip(df_ookla, df_fast, df_ndt7, ping_by_host):
-    """Build KPI strip with key metrics."""
+    # ── KPI strip ────────────────────────────────────────────────────────────
     ookla_dl  = latest_val(df_ookla, "download_mbps")
     ookla_ul  = latest_val(df_ookla, "upload_mbps")
     ookla_png = latest_val(df_ookla, "ping_ms")
@@ -336,7 +299,7 @@ def _build_kpi_strip(df_ookla, df_fast, df_ndt7, ping_by_host):
     cf_ping   = latest_val(ping_by_host.get("Cloudflare-DNS-JHB"), "avg_ms")
     cf_loss   = latest_val(ping_by_host.get("Cloudflare-DNS-JHB"), "packet_loss_pct")
 
-    return html.Div([
+    kpi_strip = html.Div([
         stat_card("DOWNLOAD",      fmt(ookla_dl),  "Mbps", ACCENT_GREEN,
                   sub=f"24h avg: {fmt(avg_dl)} Mbps"),
         stat_card("UPLOAD",        fmt(ookla_ul),  "Mbps", ACCENT_BLUE,
@@ -351,8 +314,7 @@ def _build_kpi_strip(df_ookla, df_fast, df_ndt7, ping_by_host):
                   ACCENT_GREEN if (sr_ookla or 0) >= 90 else ACCENT_RED),
     ], style={"display": "flex", "gap": "2px", "marginBottom": "20px", "flexWrap": "wrap"})
 
-def _build_ookla_panel(df_ookla):
-    """Build Ookla speedtest panel."""
+    # ── Ookla ────────────────────────────────────────────────────────────────
     fig_ookla = make_fig()
     make_line(fig_ookla, df_ookla, "download_mbps", "Download", ACCENT_GREEN)
     make_line(fig_ookla, df_ookla, "upload_mbps",   "Upload",   ACCENT_BLUE)
@@ -362,7 +324,7 @@ def _build_ookla_panel(df_ookla):
     make_line(fig_ping_ookla, df_ookla, "ping_ms", "Ping", ACCENT_AMBER)
     fig_ping_ookla.update_layout(yaxis_title="ms")
 
-    return chart_panel([
+    ookla_panel = chart_panel([
         section_header("OOKLA SPEEDTEST", "every 20 min"),
         html.Div([
             html.Div([dcc.Graph(figure=fig_ookla, config={"displayModeBar": False},
@@ -372,8 +334,7 @@ def _build_ookla_panel(df_ookla):
         ], style={"display": "flex", "gap": "2px"}),
     ])
 
-def _build_fast_ndt7_row(df_fast, df_ndt7):
-    """Build fast.com and NDT7 comparison row."""
+    # ── fast + ndt7 ──────────────────────────────────────────────────────────
     fig_fast = make_fig()
     make_line(fig_fast, df_fast, "download_mbps",  "Download",   ACCENT_GREEN)
     make_line(fig_fast, df_fast, "upload_mbps",    "Upload",     ACCENT_BLUE)
@@ -387,7 +348,7 @@ def _build_fast_ndt7_row(df_fast, df_ndt7):
     make_line(fig_ndt7, df_ndt7, "rtt_ms",        "RTT",      ACCENT_AMBER, dash="dot")
     fig_ndt7.update_layout(yaxis_title="Mbps / ms")
 
-    return html.Div([
+    row_fast_ndt7 = html.Div([
         html.Div([chart_panel([
             section_header("FAST.COM", "every 20 min"),
             dcc.Graph(figure=fig_fast, config={"displayModeBar": False}, style={"height": "200px"}),
@@ -398,28 +359,29 @@ def _build_fast_ndt7_row(df_fast, df_ndt7):
         ])], style={"flex": "1"}),
     ], style={"display": "flex", "gap": "2px", "marginTop": "2px"})
 
-def _build_iperf_panel(df_iperf):
-    """Build iPerf3 panel."""
+    # ── iperf3 ───────────────────────────────────────────────────────────────
     fig_iperf = make_fig()
     make_line(fig_iperf, df_iperf, "download_mbps", "Download", ACCENT_GREEN)
     make_line(fig_iperf, df_iperf, "upload_mbps",   "Upload",   ACCENT_BLUE)
     fig_iperf.update_layout(yaxis_title="Mbps")
 
+    # Latest server used
     iperf_server = latest_val(df_iperf, "server") if df_iperf is not None and "server" in (df_iperf.columns if df_iperf is not None else []) else None
     iperf_tag = f"last server: {iperf_server}" if iperf_server else "every 20 min"
 
-    return chart_panel([
+    iperf_panel = chart_panel([
         section_header("IPERF3", iperf_tag),
         dcc.Graph(figure=fig_iperf, config={"displayModeBar": False}, style={"height": "180px"}),
     ])
 
-def _ping_accent(val, low, med, missing=999):
-    return ACCENT_GREEN if (val or missing) < low else (
-        ACCENT_AMBER if (val or missing) < med else ACCENT_RED
-    )
+    # ── Ping & packet loss ───────────────────────────────────────────────────
+    PING_COLORS = {
+        "Cloudflare-DNS-JHB": ACCENT_GREEN,
+        "Google-DNS":         ACCENT_BLUE,
+        "MLab-JHB":           ACCENT_AMBER,
+        "JHB-Local":          ACCENT_PURPLE,
+    }
 
-
-def _build_ping_figures(ping_by_host):
     fig_latency = make_fig()
     fig_loss    = make_fig()
     fig_jitter  = make_fig()
@@ -435,34 +397,25 @@ def _build_ping_figures(ping_by_host):
     fig_latency.update_layout(yaxis_title="ms")
     fig_loss.update_layout(yaxis_title="% loss")
     fig_jitter.update_layout(yaxis_title="ms")
-    return fig_latency, fig_loss, fig_jitter
 
-
-def _build_ping_cards(ping_by_host):
-    cards = []
-    for label in PING_COLORS:
+    # Latest ping stat cards
+    ping_cards = []
+    for label, color in PING_COLORS.items():
         df_h = ping_by_host.get(label)
-        lv = latest_val(df_h, "avg_ms")
+        lv   = latest_val(df_h, "avg_ms")
         loss = latest_val(df_h, "packet_loss_pct")
-        cards.append(mini_stat(
+        ping_cards.append(mini_stat(
             label.replace("-", " "),
             fmt(lv), "ms",
-            _ping_accent(lv, 20, 60)
+            ACCENT_GREEN if (lv or 999) < 20 else (ACCENT_AMBER if (lv or 999) < 60 else ACCENT_RED)
         ))
-        cards.append(mini_stat(
+        ping_cards.append(mini_stat(
             f"{label[:8]} LOSS",
             fmt(loss, 1), "%",
-            _ping_accent(loss, 0.5, 2, missing=1)
+            ACCENT_GREEN if (loss or 1) < 0.5 else (ACCENT_AMBER if (loss or 1) < 2 else ACCENT_RED)
         ))
-    return cards
 
-
-def _build_ping_panel(ping_by_host):
-    """Build ping, packet loss and jitter panel."""
-    fig_latency, fig_loss, fig_jitter = _build_ping_figures(ping_by_host)
-    ping_cards = _build_ping_cards(ping_by_host)
-
-    return chart_panel([
+    ping_panel = chart_panel([
         section_header("PING / PACKET LOSS / JITTER", "every 20 min"),
         html.Div(ping_cards, style={"display": "flex", "gap": "2px", "marginBottom": "12px", "flexWrap": "wrap"}),
         html.Div([
@@ -484,48 +437,7 @@ def _build_ping_panel(ping_by_host):
         ], style={"display": "flex", "gap": "2px"}),
     ])
 
-def _build_mtr_panel(df_mtr, mtr_target):
-    """Build MTR routing audit panel."""
-    mtr_content = html.Div("No MTR data available for this target.", style={"color": TEXT_DIM, "fontFamily": FONT_MONO})
-    
-    if df_mtr is not None and "label" in df_mtr.columns:
-        df_t = df_mtr[df_mtr["label"] == mtr_target]
-        if not df_t.empty:
-            latest_ts = df_t["timestamp"].max()
-            current_hops = df_t[df_t["timestamp"] == latest_ts]
-            
-            if "hop" in current_hops.columns:
-                current_hops = current_hops.sort_values("hop")
-            
-            rows = []
-            for idx, row in current_hops.iterrows():
-                lat_color = ACCENT_RED if row.get('avg_ms', 0) > 150 else (ACCENT_AMBER if row.get('avg_ms', 0) > 50 else TEXT_PRIMARY)
-                loss_color = ACCENT_RED if row.get('loss_pct', 0) > 0 else TEXT_DIM
-                
-                rows.append(html.Tr([
-                    html.Td(f"#{row.get('hop', '?')}", style={"color": TEXT_DIM, "padding": "6px 16px", "fontFamily": FONT_MONO, "fontSize": "11px", "borderBottom": f"1px solid {BORDER}"}),
-                    html.Td(row.get('host', ''), style={"color": TEXT_PRIMARY, "padding": "6px 16px", "fontFamily": FONT_MONO, "fontSize": "11px", "borderBottom": f"1px solid {BORDER}"}),
-                    html.Td(fmt(row.get('avg_ms')), style={"color": lat_color, "padding": "6px 16px", "fontFamily": FONT_MONO, "fontSize": "11px", "borderBottom": f"1px solid {BORDER}"}),
-                    html.Td(fmt(row.get('loss_pct'), 1) + "%", style={"color": loss_color, "padding": "6px 16px", "fontFamily": FONT_MONO, "fontSize": "11px", "borderBottom": f"1px solid {BORDER}"}),
-                    html.Td(fmt(row.get('jitter_ms')), style={"color": TEXT_DIM, "padding": "6px 16px", "fontFamily": FONT_MONO, "fontSize": "11px", "borderBottom": f"1px solid {BORDER}"}),
-                ]))
-
-            mtr_content = html.Table([
-                html.Thead(html.Tr([
-                    html.Th(h, style={"fontFamily": FONT_MONO, "fontSize": "9px", "color": TEXT_DIM, "textAlign": "left", "padding": "4px 16px", "borderBottom": f"1px solid {BORDER}"}) 
-                    for h in ["HOP", "HOST", "AVG (ms)", "LOSS", "JITTER"]
-                ])),
-                html.Tbody(rows)
-            ], style={"width": "100%", "borderCollapse": "collapse"})
-
-    return chart_panel([
-        html.Div(section_header("MTR ROUTING AUDIT", mtr_target),
-                 style={"marginBottom": "15px"}),
-        mtr_content
-    ])
-
-def _build_dns_panel(dns_by_resolver):
-    """Build DNS resolver latency panel."""
+    # ── DNS latency ──────────────────────────────────────────────────────────
     DNS_COLORS = {"Cloudflare": ACCENT_GREEN, "Google": ACCENT_BLUE, "Quad9": ACCENT_AMBER}
     fig_dns = make_fig()
     for label, color in DNS_COLORS.items():
@@ -540,14 +452,13 @@ def _build_dns_panel(dns_by_resolver):
         dns_cards.append(mini_stat(label, fmt(lv), "ms",
             ACCENT_GREEN if (lv or 999) < 50 else (ACCENT_AMBER if (lv or 999) < 150 else ACCENT_RED)))
 
-    return chart_panel([
+    dns_panel = chart_panel([
         section_header("DNS RESOLVER LATENCY", "every 20 min"),
         html.Div(dns_cards, style={"display": "flex", "gap": "2px", "marginBottom": "12px"}),
         dcc.Graph(figure=fig_dns, config={"displayModeBar": False}, style={"height": "160px"}),
     ])
 
-def _build_curl_panel(curl_targets):
-    """Build curl download targets panel."""
+    # ── Curl targets ─────────────────────────────────────────────────────────
     CURL_COLORS = {
         "hetzner_fsn1": ACCENT_GREEN,
         "hetzner_ash":  ACCENT_BLUE,
@@ -560,8 +471,12 @@ def _build_curl_panel(curl_targets):
         "hetzner_hel1": "Hetzner HEL1 (Helsinki)",
         "ubuntu_noble": "Ubuntu ISO / Canonical CDN",
     }
-    
+    # curl_targets is grouped by target_name and contains ALL sizes mixed.
+    # Filter by file_size_mb to separate light (100MB), heavy (1GB), and
+    # superheavy (10GB) runs correctly using proper pandas boolean indexing.
+
     def curl_filter(k, min_mb, max_mb):
+        """Return rows for target k where file_size_mb is in [min_mb, max_mb]."""
         if k not in curl_targets:
             return None
         tdf = curl_targets[k]
@@ -599,6 +514,8 @@ def _build_curl_panel(curl_targets):
         ))
     fig_curl_heavy.update_layout(yaxis_title="Mbps")
 
+    # Stat cards — one per unique target, using 100MB runs for light targets
+    # and the appropriate size for heavy (ubuntu uses all its data, Hetzner 1GB)
     curl_stats = []
     stat_configs = [
         ("hetzner_fsn1",  50,  200),
@@ -627,7 +544,7 @@ def _build_curl_panel(curl_targets):
             CURL_COLORS.get(k, TEXT_MUTED), sub=f"avg: {fmt(av)} Mbps",
         ))
 
-    return chart_panel([
+    curl_panel = chart_panel([
         section_header("CURL DOWNLOAD TARGETS", "real files / no disk write"),
         html.Div(curl_stats, style={"display": "flex", "gap": "2px", "marginBottom": "12px", "flexWrap": "wrap"}),
         html.Div([
@@ -644,8 +561,7 @@ def _build_curl_panel(curl_targets):
         ], style={"display": "flex", "gap": "16px"}),
     ])
 
-def _build_superheavy_panel(curl_superheavy):
-    """Build 10GB sustained download panel."""
+    # ── Superheavy 10GB ──────────────────────────────────────────────────────
     fig_sh = make_fig()
     sh_cards = []
     for k, color in [("hetzner_fsn1", ACCENT_GREEN), ("hetzner_ash", ACCENT_BLUE)]:
@@ -653,26 +569,26 @@ def _build_superheavy_panel(curl_superheavy):
             tdf = curl_superheavy[k]
             fig_sh.add_trace(go.Scatter(
                 x=tdf["timestamp"], y=tdf["download_mbps"],
-                name={"hetzner_fsn1": "Hetzner FSN1 (Frankfurt)", "hetzner_ash": "Hetzner ASH (Ashburn)"}.get(k, k), mode="lines+markers",
+                name=CURL_LABELS.get(k, k), mode="lines+markers",
                 marker=dict(size=6, color=color),
                 line=dict(color=color, width=2),
-                hovertemplate="%{y:.1f} Mbps<extra>" + {"hetzner_fsn1": "Hetzner FSN1 (Frankfurt)", "hetzner_ash": "Hetzner ASH (Ashburn)"}.get(k, k) + "</extra>",
+                hovertemplate="%{y:.1f} Mbps<extra>" + CURL_LABELS.get(k, k) + "</extra>",
             ))
             lv = tdf["download_mbps"].dropna().iloc[-1] if not tdf["download_mbps"].dropna().empty else None
             av = tdf["download_mbps"].dropna().mean()   if not tdf["download_mbps"].dropna().empty else None
-            server_name = {"hetzner_fsn1": "Hetzner FSN1 (Frankfurt)", "hetzner_ash": "Hetzner ASH (Ashburn)"}.get(k, k)
             sh_cards.append(stat_card(
-                f"10GB  {server_name}", fmt(lv), "Mbps", color, sub=f"all-time avg: {fmt(av)} Mbps",))
+                f"10GB  {CURL_LABELS.get(k,k)}", fmt(lv), "Mbps", color,
+                sub=f"all-time avg: {fmt(av)} Mbps",
+            ))
     fig_sh.update_layout(yaxis_title="Mbps")
 
-    return chart_panel([
+    sh_panel = chart_panel([
         section_header("10 GB SUSTAINED DOWNLOAD", "once per day — best-case line speed"),
         html.Div(sh_cards, style={"display": "flex", "gap": "2px", "marginBottom": "12px", "flexWrap": "wrap"}),
         dcc.Graph(figure=fig_sh, config={"displayModeBar": False}, style={"height": "200px"}),
     ])
 
-def _build_summary_panel(df_ookla, df_fast, df_ndt7, df_iperf):
-    """Build 24-hour averages summary panel."""
+    # ── 24h averages table ───────────────────────────────────────────────────
     rows = []
     sources = [
         ("Ookla",    df_ookla, "download_mbps", "upload_mbps"),
@@ -680,7 +596,7 @@ def _build_summary_panel(df_ookla, df_fast, df_ndt7, df_iperf):
         ("NDT7",     df_ndt7,  "download_mbps", "upload_mbps"),
         ("iPerf3",   df_iperf, "download_mbps", "upload_mbps"),
     ]
-    cell_fn = lambda txt, color=TEXT_PRIMARY: html.Td(txt, style={
+    cell = lambda txt, color=TEXT_PRIMARY: html.Td(txt, style={
         "fontFamily": FONT_MONO, "fontSize": "12px", "color": color,
         "padding": "8px 16px", "borderBottom": f"1px solid {BG_PANEL2}",
     })
@@ -691,14 +607,14 @@ def _build_summary_panel(df_ookla, df_fast, df_ndt7, df_iperf):
         sr   = success_rate(df, 24)
         sr_color = ACCENT_GREEN if (sr or 0) >= 95 else (ACCENT_AMBER if (sr or 0) >= 80 else ACCENT_RED)
         rows.append(html.Tr([
-            cell_fn(sname, TEXT_MUTED),
-            cell_fn(fmt(a_dl), ACCENT_GREEN),
-            cell_fn(fmt(a_ul), ACCENT_BLUE),
-            cell_fn(fmt(p_dl), ACCENT_AMBER),
-            cell_fn(fmt(sr, 0) + "%", sr_color),
+            cell(sname, TEXT_MUTED),
+            cell(fmt(a_dl), ACCENT_GREEN),
+            cell(fmt(a_ul), ACCENT_BLUE),
+            cell(fmt(p_dl), ACCENT_AMBER),
+            cell(fmt(sr, 0) + "%", sr_color),
         ]))
 
-    return chart_panel([
+    summary_panel = chart_panel([
         section_header("24-HOUR AVERAGES", "all sources"),
         html.Table([
             html.Thead(html.Tr([
@@ -712,59 +628,7 @@ def _build_summary_panel(df_ookla, df_fast, df_ndt7, df_iperf):
         ], style={"width": "100%", "borderCollapse": "collapse"}),
     ])
 
-@app.callback(
-    Output("dashboard-content", "children"),
-    [Input("tick", "n_intervals"),
-     Input("mtr-target-selector", "value")]
-)
-def update_dashboard(n, mtr_target):
-    mtr_target = mtr_target or "NAPAfrica-JHB"
-
-    data = _load_all_data()
-    df_ookla, df_fast, df_iperf, df_ndt7, df_curl = data["ookla"], data["fast"], data["iperf"], data["ndt7"], data["curl"]
-    df_ping, df_dns, df_mtr = data["ping"], data["dns"], data["mtr"]
-
-    curl_targets, curl_superheavy = _split_curl_data(df_curl)
-    ping_by_host = _split_ping_data(df_ping)
-    dns_by_resolver = _split_dns_data(df_dns)
-
-    kpi_strip = _build_kpi_strip(df_ookla, df_fast, df_ndt7, ping_by_host)
-    ookla_panel = _build_ookla_panel(df_ookla)
-    row_fast_ndt7 = _build_fast_ndt7_row(df_fast, df_ndt7)
-    iperf_panel = _build_iperf_panel(df_iperf)
-    ping_panel = _build_ping_panel(ping_by_host)
-    mtr_panel = _build_mtr_panel(df_mtr, mtr_target)
-    dns_panel = _build_dns_panel(dns_by_resolver)
-    curl_panel = _build_curl_panel(curl_targets)
-    sh_panel = _build_superheavy_panel(curl_superheavy)
-    summary_panel = _build_summary_panel(df_ookla, df_fast, df_ndt7, df_iperf)
-
-    # ── KPI strip ────────────────────────────────────────────────────────────
-    ookla_dl  = latest_val(df_ookla, "download_mbps")
-    ookla_ul  = latest_val(df_ookla, "upload_mbps")
-    ookla_png = latest_val(df_ookla, "ping_ms")
-    avg_dl    = avg_val(df_ookla, "download_mbps", 24)
-    avg_ul    = avg_val(df_ookla, "upload_mbps",   24)
-    sr_ookla  = success_rate(df_ookla, 24)
-    bloat     = latest_val(df_fast, "bufferbloat_ms")
-    cf_ping   = latest_val(ping_by_host.get("Cloudflare-DNS-JHB"), "avg_ms")
-    cf_loss   = latest_val(ping_by_host.get("Cloudflare-DNS-JHB"), "packet_loss_pct")
-
-    kpi_strip = html.Div([
-        stat_card("DOWNLOAD",      fmt(ookla_dl),  "Mbps", ACCENT_GREEN,
-                  sub=f"24h avg: {fmt(avg_dl)} Mbps"),
-        stat_card("UPLOAD",        fmt(ookla_ul),  "Mbps", ACCENT_BLUE,
-                  sub=f"24h avg: {fmt(avg_ul)} Mbps"),
-        stat_card("PING",          fmt(ookla_png), "ms",   ACCENT_AMBER),
-        stat_card("CF LATENCY",    fmt(cf_ping),   "ms",   ACCENT_AMBER,
-                  sub=f"loss: {fmt(cf_loss, 1)}%"),
-        stat_card("BUFFERBLOAT",   fmt(bloat),     "ms",
-                  ACCENT_GREEN if (bloat or 999) < 50 else (ACCENT_AMBER if (bloat or 999) < 100 else ACCENT_RED)),
-        stat_card("NDT7 DL",       fmt(latest_val(df_ndt7, "download_mbps")), "Mbps", ACCENT_PURPLE),
-        stat_card("OOKLA SUCCESS", fmt(sr_ookla, 0), "%",
-                  ACCENT_GREEN if (sr_ookla or 0) >= 90 else ACCENT_RED),
-    ], style={"display": "flex", "gap": "2px", "marginBottom": "20px", "flexWrap": "wrap"})
-
+    # ── Footer ───────────────────────────────────────────────────────────────
     footer = html.Div([
         html.Span("SIGMON", style={"color": ACCENT_AMBER, "fontFamily": FONT_MONO,
                                     "fontSize": "10px", "letterSpacing": "0.15em"}),
@@ -774,11 +638,20 @@ def update_dashboard(n, mtr_target):
     ], style={"borderTop": f"1px solid {BORDER}", "padding": "12px 0", "marginTop": "20px"})
 
     return html.Div([
-        kpi_strip, ookla_panel, GAP, row_fast_ndt7, GAP, iperf_panel, GAP,
-        ping_panel, GAP, mtr_panel, GAP,
-        html.Div([html.Div([dns_panel], style={"flex": "1"})], style={"display": "flex", "gap": "2px", "marginTop": "2px"}),
-        GAP, curl_panel, GAP, sh_panel, html.Div(style={"height": "20px"}),
-        summary_panel, footer,
+        kpi_strip,
+        ookla_panel, GAP,
+        row_fast_ndt7, GAP,
+        iperf_panel, GAP,
+        ping_panel, GAP,
+        html.Div([
+            html.Div([dns_panel], style={"flex": "1"}),
+        ], style={"display": "flex", "gap": "2px", "marginTop": "2px"}),
+        GAP,
+        curl_panel, GAP,
+        sh_panel,
+        html.Div(style={"height": "20px"}),
+        summary_panel,
+        footer,
     ], className="panel")
 
 
