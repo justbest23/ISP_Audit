@@ -50,7 +50,7 @@ def init_csvs():
     ensure_csv(CSVS["curl"],   ["timestamp", "target_name", "region", "file_size_mb", "download_mbps", "status"])
     ensure_csv(CSVS["ping"],   ["timestamp", "host", "host_label", "avg_ms", "min_ms", "max_ms", "jitter_ms", "packet_loss_pct", "status"])
     ensure_csv(CSVS["dns"],    ["timestamp", "resolver", "lookup_ms", "status"])
-    ensure_csv(CSVS["mtr"], ["timestamp", "host", "label", "avg_ms", "max_ms", "jitter_ms", "loss_pct", "status"])
+    ensure_csv(CSVS["mtr"],    ["timestamp", "host", "label", "avg_ms", "max_ms", "jitter_ms", "loss_pct", "status"])
 
 def append_csv(filename, row):
     with open(filename, "a", newline="") as f:
