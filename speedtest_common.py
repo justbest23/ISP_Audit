@@ -28,6 +28,7 @@ CSVS = {
     "curl":        f"{LOG_DIR}/curl.csv",
     "ping":        f"{LOG_DIR}/ping.csv",
     "dns":         f"{LOG_DIR}/dns.csv",
+    "mtr":         f"{LOG_DIR}/mtr.csv",
 }
 
 # ---------------------------------------------------------------------------
@@ -49,6 +50,7 @@ def init_csvs():
     ensure_csv(CSVS["curl"],   ["timestamp", "target_name", "region", "file_size_mb", "download_mbps", "status"])
     ensure_csv(CSVS["ping"],   ["timestamp", "host", "host_label", "avg_ms", "min_ms", "max_ms", "jitter_ms", "packet_loss_pct", "status"])
     ensure_csv(CSVS["dns"],    ["timestamp", "resolver", "lookup_ms", "status"])
+    ensure_csv(CSVS["mtr"], ["timestamp", "host", "label", "avg_ms", "max_ms", "jitter_ms", "loss_pct", "status"])
 
 def append_csv(filename, row):
     with open(filename, "a", newline="") as f:
@@ -222,6 +224,62 @@ def run_ookla(timestamp):
 
     append_csv(CSVS["ookla"], [timestamp, download, upload, ping, server_name, server_location, isp, status])
 
+
+# ---------------------------------------------------------------------------
+# MTR (PingPlotter-style) Audit
+# ---------------------------------------------------------------------------
+
+MTR_TARGETS = [
+    # 1. CORE INFRASTRUCTURE (The Heart of SA Peering)
+    ("196.60.8.1",      "NAPAfrica-JHB"),      # Teraco Johannesburg (where all SA ISPs meet)
+    ("155.232.0.1",     "TENET-JHB"),          # Research/Academic backbone (very stable)
+    
+    # 2. GAMING CLUSTERS (Low latency checks)
+    ("197.80.200.1",    "Dota2-CS2-JHB"),      # MWEB/Krypton Gaming Cluster
+    ("160.119.102.162", "Valorant-JHB"),       # Riot Games South Africa
+    
+    # 3. CLOUD & CONTENT (Work/Streaming)
+    ("rds.af-south-1.amazonaws.com", "AWS-CapeTown"), # AWS Africa (Cape Town)
+    ("197.221.23.194",  "Netflix-OC-JHB"),     # Netflix Open Connect (Seacom JHB)
+    
+    # 4. INTERNATIONAL GATEWAYS (Undersea Cable Health)
+    ("193.58.13.249",   "Seacom-London"),      # Test the WACS/SAT3/Equiano path to UK
+    ("80.249.208.1",    "AMS-IX-Europe"),      # Amsterdam Internet Exchange
+    
+    # 5. STANDARD FALLBACKS
+    ("1.1.1.1",         "Cloudflare-DNS"),
+    ("8.8.8.8",         "Google-DNS"),
+]
+
+def run_mtr_tests(timestamp, count=10):
+    for host, label in MTR_TARGETS:
+        print(f"[mtr] {label} ({host})...")
+        try:
+            # -r: report mode, -c: cycle count, -n: no DNS, --json: json output
+            out = subprocess.check_output(
+                ["mtr", "-r", "-n", "-c", str(count), "--json", host],
+                text=True, timeout=60
+            )
+            data = json.loads(out)
+            # The last hub is the destination
+            last_hop = data['report']['hubs'][-1]
+            
+            avg_ms    = last_hop.get('Avg', 0)
+            max_ms    = last_hop.get('Wrst', 0)
+            jitter_ms = last_hop.get('StDev', 0)
+            loss_pct  = last_hop.get('Loss%', 0)
+            status    = "success"
+            
+            print(f"[mtr]   avg={avg_ms}ms  loss={loss_pct}%")
+        except Exception as e:
+            print(f"[mtr]   {label} FAIL: {e}")
+            avg_ms = max_ms = jitter_ms = loss_pct = 0
+            status = "fail"
+
+        append_csv(CSVS["mtr"], [timestamp, host, label, avg_ms, max_ms, jitter_ms, loss_pct, status])
+
+
+        
 # ---------------------------------------------------------------------------
 # Ping / packet loss / jitter
 #

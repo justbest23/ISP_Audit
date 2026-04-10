@@ -27,5 +27,6 @@ if __name__ == "__main__":
     run_ndt7(timestamp)
     run_curl_light(timestamp)
     run_ping_tests(timestamp)
+    run_mtr_tests(timestamp)
     run_dns_tests(timestamp)
     print("=== [LIGHT] Done ===")
