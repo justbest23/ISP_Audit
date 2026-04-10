@@ -28,7 +28,6 @@ CSVS = {
     "curl":        f"{LOG_DIR}/curl.csv",
     "ping":        f"{LOG_DIR}/ping.csv",
     "dns":         f"{LOG_DIR}/dns.csv",
-    "mtr":         f"{LOG_DIR}/mtr.csv",
 }
 
 # ---------------------------------------------------------------------------
@@ -50,7 +49,6 @@ def init_csvs():
     ensure_csv(CSVS["curl"],   ["timestamp", "target_name", "region", "file_size_mb", "download_mbps", "status"])
     ensure_csv(CSVS["ping"],   ["timestamp", "host", "host_label", "avg_ms", "min_ms", "max_ms", "jitter_ms", "packet_loss_pct", "status"])
     ensure_csv(CSVS["dns"],    ["timestamp", "resolver", "lookup_ms", "status"])
-    ensure_csv(CSVS["mtr"],    ["timestamp", "host", "label", "avg_ms", "max_ms", "jitter_ms", "loss_pct", "status"])
 
 def append_csv(filename, row):
     with open(filename, "a", newline="") as f:
@@ -224,62 +222,6 @@ def run_ookla(timestamp):
 
     append_csv(CSVS["ookla"], [timestamp, download, upload, ping, server_name, server_location, isp, status])
 
-
-# ---------------------------------------------------------------------------
-# MTR (PingPlotter-style) Audit
-# ---------------------------------------------------------------------------
-
-MTR_TARGETS = [
-    # 1. CORE INFRASTRUCTURE (The Heart of SA Peering)
-    ("196.60.8.1",      "NAPAfrica-JHB"),      # Teraco Johannesburg (where all SA ISPs meet)
-    ("155.232.0.1",     "TENET-JHB"),          # Research/Academic backbone (very stable)
-    
-    # 2. GAMING CLUSTERS (Low latency checks)
-    ("197.80.200.1",    "Dota2-CS2-JHB"),      # MWEB/Krypton Gaming Cluster
-    ("160.119.102.162", "Valorant-JHB"),       # Riot Games South Africa
-    
-    # 3. CLOUD & CONTENT (Work/Streaming)
-    ("rds.af-south-1.amazonaws.com", "AWS-CapeTown"), # AWS Africa (Cape Town)
-    ("197.221.23.194",  "Netflix-OC-JHB"),     # Netflix Open Connect (Seacom JHB)
-    
-    # 4. INTERNATIONAL GATEWAYS (Undersea Cable Health)
-    ("193.58.13.249",   "Seacom-London"),      # Test the WACS/SAT3/Equiano path to UK
-    ("80.249.208.1",    "AMS-IX-Europe"),      # Amsterdam Internet Exchange
-    
-    # 5. STANDARD FALLBACKS
-    ("1.1.1.1",         "Cloudflare-DNS"),
-    ("8.8.8.8",         "Google-DNS"),
-]
-
-def run_mtr_tests(timestamp, count=10):
-    for host, label in MTR_TARGETS:
-        print(f"[mtr] {label} ({host})...")
-        try:
-            # -r: report mode, -c: cycle count, -n: no DNS, --json: json output
-            out = subprocess.check_output(
-                ["mtr", "-r", "-n", "-c", str(count), "--json", host],
-                text=True, timeout=60
-            )
-            data = json.loads(out)
-            # The last hub is the destination
-            last_hop = data['report']['hubs'][-1]
-            
-            avg_ms    = last_hop.get('Avg', 0)
-            max_ms    = last_hop.get('Wrst', 0)
-            jitter_ms = last_hop.get('StDev', 0)
-            loss_pct  = last_hop.get('Loss%', 0)
-            status    = "success"
-            
-            print(f"[mtr]   avg={avg_ms}ms  loss={loss_pct}%")
-        except Exception as e:
-            print(f"[mtr]   {label} FAIL: {e}")
-            avg_ms = max_ms = jitter_ms = loss_pct = 0
-            status = "fail"
-
-        append_csv(CSVS["mtr"], [timestamp, host, label, avg_ms, max_ms, jitter_ms, loss_pct, status])
-
-
-        
 # ---------------------------------------------------------------------------
 # Ping / packet loss / jitter
 #
@@ -442,3 +384,270 @@ def run_curl_heavy(timestamp):
 def run_curl_superheavy(timestamp):
     for target in CURL_SUPERHEAVY_TARGETS:
         _run_curl_target(timestamp, *target)
+
+# ---------------------------------------------------------------------------
+# Eweka Usenet speed test
+#
+# Opens N parallel SSL NNTP connections to news.eweka.nl, authenticates,
+# then downloads article bodies from a high-traffic binary group into
+# /dev/null. Measures sustained real-world throughput over ~60 seconds.
+#
+# This is the most realistic possible download test because:
+#   - It uses your actual paid Usenet account (no shared public server)
+#   - Multi-connection SSL mirrors how NZBGet/SABnzbd actually downloads
+#   - Eweka is in Amsterdam — tests your EU routing under real conditions
+#
+# Credentials are read from ~/.config/sigmon/credentials.ini:
+#
+#   [eweka]
+#   username    = your_username
+#   password    = your_password
+#   server      = news.eweka.nl
+#   port        = 563
+#   connections = 10
+#
+# ---------------------------------------------------------------------------
+
+import ssl
+import socket
+import threading
+import time
+import configparser
+from pathlib import Path
+
+CREDENTIALS_FILE = Path.home() / ".config" / "sigmon" / "credentials.ini"
+
+def _load_eweka_config():
+    """Load Eweka credentials from config file. Returns dict or None."""
+    if not CREDENTIALS_FILE.exists():
+        print(f"[eweka] Config file not found: {CREDENTIALS_FILE}")
+        print(f"[eweka] Create it with:")
+        print(f"        mkdir -p ~/.config/sigmon")
+        print(f"        nano {CREDENTIALS_FILE}")
+        print(f"        [eweka]")
+        print(f"        username    = your_username")
+        print(f"        password    = your_password")
+        print(f"        server      = news.eweka.nl")
+        print(f"        port        = 563")
+        print(f"        connections = 10")
+        return None
+    cfg = configparser.ConfigParser()
+    cfg.read(CREDENTIALS_FILE)
+    if "eweka" not in cfg:
+        print(f"[eweka] No [eweka] section in {CREDENTIALS_FILE}")
+        return None
+    return {
+        "server":      cfg["eweka"].get("server",      "news.eweka.nl"),
+        "port":        int(cfg["eweka"].get("port",    "563")),
+        "username":    cfg["eweka"].get("username",    ""),
+        "password":    cfg["eweka"].get("password",    ""),
+        "connections": int(cfg["eweka"].get("connections", "10")),
+    }
+
+def _nntp_ssl_connect(server, port, username, password, timeout=30):
+    """
+    Open a raw SSL NNTP connection, authenticate, and return the socket.
+    Returns None on failure.
+    """
+    ctx = ssl.create_default_context()
+    try:
+        raw = socket.create_connection((server, port), timeout=timeout)
+        sock = ctx.wrap_socket(raw, server_hostname=server)
+        sock.settimeout(timeout)
+
+        def recv_line():
+            buf = b""
+            while not buf.endswith(b"\r\n"):
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                buf += chunk
+            return buf.decode("utf-8", errors="replace").strip()
+
+        def send(cmd):
+            sock.sendall((cmd + "\r\n").encode())
+
+        # Read greeting
+        greeting = recv_line()
+        if not greeting.startswith("2"):
+            raise Exception(f"Bad greeting: {greeting}")
+
+        # Auth
+        send(f"AUTHINFO USER {username}")
+        resp = recv_line()
+        if resp.startswith("381"):
+            send(f"AUTHINFO PASS {password}")
+            resp = recv_line()
+        if not resp.startswith("281"):
+            raise Exception(f"Auth failed: {resp}")
+
+        return sock, recv_line
+
+    except Exception as e:
+        print(f"[eweka]   connect FAIL: {e}")
+        return None, None
+
+
+def _worker_download(server, port, username, password, duration_s,
+                     counter, counter_lock, errors, stop_event):
+    """
+    Single worker thread: connects, selects a group, streams article
+    bodies for `duration_s` seconds, accumulates byte count in counter.
+    """
+    # High-volume binary group — large articles, consistently available
+    GROUP = "alt.binaries.boneless"
+
+    ctx = ssl.create_default_context()
+    try:
+        raw  = socket.create_connection((server, port), timeout=30)
+        sock = ctx.wrap_socket(raw, server_hostname=server)
+        sock.settimeout(60)
+        buf  = b""
+
+        def recv_line():
+            nonlocal buf
+            while b"\r\n" not in buf:
+                chunk = sock.recv(65536)
+                if not chunk:
+                    return ""
+                buf += chunk
+            line, buf = buf.split(b"\r\n", 1)
+            return line.decode("utf-8", errors="replace").strip()
+
+        def recv_body():
+            """Read a multi-line NNTP body until '.\r\n', return byte count."""
+            nonlocal buf
+            total = 0
+            while True:
+                while b"\r\n" not in buf:
+                    chunk = sock.recv(65536)
+                    if not chunk:
+                        return total
+                    total += len(chunk)
+                    buf += chunk
+                line, buf = buf.split(b"\r\n", 1)
+                if line == b".":
+                    return total
+
+        def send(cmd):
+            sock.sendall((cmd + "\r\n").encode())
+
+        # Greeting
+        greeting = recv_line()
+        if not greeting.startswith("2"):
+            raise Exception(f"Bad greeting: {greeting}")
+
+        # Auth
+        send(f"AUTHINFO USER {username}")
+        r = recv_line()
+        if r.startswith("381"):
+            send(f"AUTHINFO PASS {password}")
+            r = recv_line()
+        if not r.startswith("281"):
+            raise Exception(f"Auth failed: {r}")
+
+        # Select group
+        send(f"GROUP {GROUP}")
+        r = recv_line()
+        if not r.startswith("211"):
+            raise Exception(f"GROUP failed: {r}")
+
+        # Parse article range: "211 count first last group"
+        parts     = r.split()
+        first_art = int(parts[2])
+        last_art  = int(parts[3])
+
+        # Start near the end where articles are freshest/largest
+        article_id = max(first_art, last_art - 50000)
+
+        while not stop_event.is_set():
+            if article_id > last_art:
+                article_id = max(first_art, last_art - 50000)
+
+            send(f"BODY {article_id}")
+            r = recv_line()
+            article_id += 1
+
+            if r.startswith("222"):
+                nbytes = recv_body()
+                with counter_lock:
+                    counter[0] += nbytes
+            elif r.startswith("423") or r.startswith("430"):
+                # Article not found — skip
+                continue
+            else:
+                # Unexpected response, small pause
+                time.sleep(0.1)
+
+    except Exception as e:
+        with counter_lock:
+            errors.append(str(e))
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
+def run_eweka(timestamp, duration_s=60):
+    """
+    Run a multi-connection Eweka Usenet speed test for `duration_s` seconds.
+    Logs result to curl.csv with target_name='eweka'.
+    """
+    print("[eweka] Starting...")
+
+    cfg = _load_eweka_config()
+    if cfg is None:
+        append_csv(CSVS["curl"], [timestamp, "eweka", "EU-Usenet", 0, 0, "config_missing"])
+        return
+
+    server  = cfg["server"]
+    port    = cfg["port"]
+    user    = cfg["username"]
+    pw      = cfg["password"]
+    n_conns = cfg["connections"]
+
+    print(f"[eweka] {server}:{port}  connections={n_conns}  duration={duration_s}s")
+
+    counter      = [0]          # total bytes received across all threads
+    counter_lock = threading.Lock()
+    errors       = []
+    stop_event   = threading.Event()
+
+    threads = []
+    for i in range(n_conns):
+        t = threading.Thread(
+            target=_worker_download,
+            args=(server, port, user, pw, duration_s,
+                  counter, counter_lock, errors, stop_event),
+            daemon=True,
+        )
+        threads.append(t)
+
+    t_start = time.monotonic()
+    for t in threads:
+        t.start()
+
+    time.sleep(duration_s)
+    stop_event.set()
+
+    for t in threads:
+        t.join(timeout=15)
+
+    elapsed  = time.monotonic() - t_start
+    total_mb = counter[0] / (1024 * 1024)
+    speed_mbps = round((counter[0] * 8) / (elapsed * 1_000_000), 2)
+
+    if errors:
+        unique_errors = list(set(errors))
+        print(f"[eweka] {len(errors)} thread error(s): {unique_errors[:3]}")
+
+    if speed_mbps > 0:
+        status = "success"
+        print(f"[eweka] {total_mb:.1f} MB in {elapsed:.1f}s = {speed_mbps} Mbps")
+    else:
+        status = "fail"
+        print(f"[eweka] FAIL — 0 bytes received")
+
+    # Size logged as approximate MB transferred (varies each run)
+    append_csv(CSVS["curl"], [timestamp, "eweka", "EU-Usenet", round(total_mb), speed_mbps, status])
