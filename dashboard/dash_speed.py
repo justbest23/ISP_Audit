@@ -166,6 +166,9 @@ GAP = html.Div(style={"height": "2px"})
 
 app = dash.Dash(__name__, title="SIGMON // Speed Monitor")
 
+## ChatGPT Additions ##
+server = app.server
+###
 app.index_string = '''
 <!DOCTYPE html>
 <html>
