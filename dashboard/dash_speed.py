@@ -214,6 +214,7 @@ GAP = html.Div(style={"height": "2px"})
 # ---------------------------------------------------------------------------
 
 app = dash.Dash(__name__, title="SIGMON // Speed Monitor")
+app.config.suppress_callback_exceptions = True
 server = app.server
 
 app.index_string = '''
