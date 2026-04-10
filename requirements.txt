@@ -3,3 +3,4 @@ dash
 plotly
 gunicorn
 python-dateutil
+dash_bootstrap_components
