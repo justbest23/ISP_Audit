@@ -252,8 +252,25 @@ app.layout = html.Div([
         "backgroundColor": BG_PANEL, "position": "sticky", "top": "0", "zIndex": "100",
     }),
 
-    html.Div([html.Div(id="dashboard-content")],
-             style={"padding": "20px 24px", "maxWidth": "1600px", "margin": "0 auto"}),
+    html.Div([
+        dcc.Dropdown(
+            id="mtr-target-selector",
+            options=[{"label": name, "value": name} for _, name in MTR_TARGETS],
+            value="NAPAfrica-JHB",
+            clearable=False,
+            className="dash-dropdown",
+            style={
+                "backgroundColor": BG_PANEL2,
+                "color": "#000",
+                "width": "250px",
+                "fontFamily": FONT_MONO,
+                "fontSize": "11px",
+                "border": f"1px solid {BORDER}",
+                "marginBottom": "16px",
+            },
+        ),
+        html.Div(id="dashboard-content")
+    ], style={"padding": "20px 24px", "maxWidth": "1600px", "margin": "0 auto"}),
 ], style={"backgroundColor": BG_PAGE, "minHeight": "100vh"})
 
 # ---------------------------------------------------------------------------
@@ -502,20 +519,8 @@ def _build_mtr_panel(df_mtr, mtr_target):
             ], style={"width": "100%", "borderCollapse": "collapse"})
 
     return chart_panel([
-        html.Div([
-            section_header("MTR ROUTING AUDIT", mtr_target),
-            dcc.Dropdown(
-                id="mtr-target-selector",
-                options=[{"label": name, "value": name} for addr, name in MTR_TARGETS],
-                value=mtr_target,
-                clearable=False,
-                className="dash-dropdown",
-                style={
-                    "backgroundColor": BG_PANEL2, "color": "#000", "width": "250px",
-                    "fontFamily": FONT_MONO, "fontSize": "11px", "border": f"1px solid {BORDER}"
-                }
-            )
-        ], style={"display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "15px"}),
+        html.Div(section_header("MTR ROUTING AUDIT", mtr_target),
+                 style={"marginBottom": "15px"}),
         mtr_content
     ])
 
