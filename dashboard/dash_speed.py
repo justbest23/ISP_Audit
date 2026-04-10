@@ -752,33 +752,38 @@ def render_isp_tab(full_dfs, filtered_dfs, hours):
                 elif loss > 1: score -= 10
     score = max(0, min(100, score))
     color = ACCENT_GREEN if score >= 80 else (ACCENT_AMBER if score >= 50 else ACCENT_RED)
-    gauge_fig = go.Figure(go.Indicator(mode="gauge+number", value=score, number={"font":{"color":color,"size":40,"family":FONT_MONO}},
-                                       gauge={"axis":{"range":[0,100],"tickcolor":TEXT_MUTED},"bar":{"color":color},"bgcolor":"rgba(0,0,0,0)",
-                                              "steps":[{"range":[0,50],"color":f"rgba({_hex_to_rgba(ACCENT_RED,0.2)})"},
-                                                       {"range":[50,80],"color":f"rgba({_hex_to_rgba(ACCENT_AMBER,0.2)})"},
-                                                       {"range":[80,100],"color":f"rgba({_hex_to_rgba(ACCENT_GREEN,0.2)})"}]}))
+    gauge_fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=score,
+        number={"font":{"color":color,"size":40,"family":FONT_MONO}},
+        gauge={"axis":{"range":[0,100],"tickcolor":TEXT_MUTED},
+               "bar":{"color":color},
+               "bgcolor":"rgba(0,0,0,0)",
+               "steps":[{"range":[0,50],"color":f"rgba({_hex_to_rgba(ACCENT_RED,0.2)})"},
+                        {"range":[50,80],"color":f"rgba({_hex_to_rgba(ACCENT_AMBER,0.2)})"},
+                        {"range":[80,100],"color":f"rgba({_hex_to_rgba(ACCENT_GREEN,0.2)})"}]}
+    ))
     gauge_fig.update_layout(height=150, margin=dict(l=20,r=20,t=30,b=10))
 
-    # ISP details
+    # ISP card
     isp_name = "Unknown"
     if ookla is not None and not ookla.empty and "isp" in ookla.columns:
         isp_name = ookla.iloc[-1]["isp"]
     isp_card = stat_card("ISP", isp_name, "", ACCENT_BLUE)
 
-    # Compare mode (simplified date pickers)
-    compare_card = chart_panel([
-        section_header("Compare Ookla Download"),
+    # Compare panel
+    compare_panel = chart_panel([
+        section_header("COMPARE OOKLA DOWNLOAD"),
         dbc.Row([
             dbc.Col(dcc.DatePickerSingle(id="date1", date=datetime.now().date()-timedelta(days=1), display_format="YYYY-MM-DD")),
             dbc.Col(dcc.DatePickerSingle(id="date2", date=datetime.now().date(), display_format="YYYY-MM-DD")),
-        ]) if 'dbc' in globals() else html.Div("Install dash-bootstrap-components for date pickers"),
+        ], className="mb-2"),
         dcc.Graph(id="compare-graph", config={"displayModeBar": False}, style={"height": "250px"})
     ])
 
     return html.Div([
-        dbc.Row([dbc.Col(isp_card, width=4), dbc.Col(dcc.Graph(figure=gauge_fig, config={"displayModeBar": False}), width=8)]) if 'dbc' in globals() else html.Div([isp_card, dcc.Graph(figure=gauge_fig)]),
+        dbc.Row([dbc.Col(isp_card, width=4), dbc.Col(dcc.Graph(figure=gauge_fig, config={"displayModeBar": False}), width=8)]),
         GAP,
-        compare_card,
+        compare_panel,
     ], className="panel")
 
 # Compare graph callback
