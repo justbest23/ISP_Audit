@@ -1,0 +1,12 @@
+services:
+  sigmon:
+    build: .
+    container_name: sigmon
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    volumes:
+      # Mount the log directory read-only into the container.
+      # The collection scripts run on the host and write here;
+      # the dashboard only reads.
+      - /home/troggoman/speedtests/logs:/home/troggoman/speedtests/logs:ro
